@@ -101,13 +101,40 @@
   </div>
 </div>
 
+
 <div style="max-width: 700px; margin: 40px auto 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 16px #cbd5e1; padding: 24px;">
   <canvas id="iotChart" height="120"></canvas>
+</div>
+
+<div style="max-width: 400px; margin: 32px auto 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 16px #cbd5e1; padding: 24px;">
+  <h3 style="margin-bottom: 12px; color: #2d3748;">Current Temp vs Humidity</h3>
+  <canvas id="pieChart" height="180"></canvas>
 </div>
 
 <div class="status" id="status"><span class="dot"></span> Live updating</div>
 
 <script>
+// Pie chart setup
+const pieCtx = document.getElementById('pieChart').getContext('2d');
+const pieData = {
+  labels: ['Temperature (°C)', 'Humidity (%)'],
+  datasets: [{
+    data: [0, 0],
+    backgroundColor: ['#f56565', '#4299e1'],
+    borderColor: ['#fff', '#fff'],
+    borderWidth: 2
+  }]
+};
+const pieChart = new Chart(pieCtx, {
+  type: 'pie',
+  data: pieData,
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom' }
+    }
+  }
+});
 const url =
   "https://api.thingspeak.com/channels/3272833/feeds.json?api_key=RY8Z0N9EF5ZOXLY5&results=1";
 
@@ -239,6 +266,9 @@ function fetchData() {
       chartData.datasets[0].data.push(temp);
       chartData.datasets[1].data.push(hum);
       iotChart.update();
+      // Update pie chart
+      pieData.datasets[0].data = [isNaN(temp) ? 0 : temp, isNaN(hum) ? 0 : hum];
+      pieChart.update();
     })
     .catch(() => {
       document.getElementById("status").innerHTML = '<span class="dot" style="background:#e53e3e"></span> Connection error';
