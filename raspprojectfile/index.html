@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IoT Temperature Monitoring</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
@@ -91,11 +92,17 @@
   <div class="card" id="temp-card">
     <h2>Temperature</h2>
     <span class="value" id="temp">--</span><span class="unit">°C</span>
+    <div id="temp-icon" style="margin-top:10px;"></div>
   </div>
   <div class="card" id="hum-card">
     <h2>Humidity</h2>
     <span class="value" id="hum">--</span><span class="unit">%</span>
+    <div id="hum-icon" style="margin-top:10px;"></div>
   </div>
+</div>
+
+<div style="max-width: 700px; margin: 40px auto 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 16px #cbd5e1; padding: 24px;">
+  <canvas id="iotChart" height="120"></canvas>
 </div>
 
 <div class="status" id="status"><span class="dot"></span> Live updating</div>
@@ -103,6 +110,62 @@
 <script>
 const url =
   "https://api.thingspeak.com/channels/3272833/feeds.json?api_key=RY8Z0N9EF5ZOXLY5&results=1";
+
+// Chart.js setup
+const ctx = document.getElementById('iotChart').getContext('2d');
+const chartData = {
+  labels: [],
+  datasets: [
+    {
+      label: 'Temperature (°C)',
+      data: [],
+      borderColor: '#f56565',
+      backgroundColor: 'rgba(245,101,101,0.1)',
+      yAxisID: 'y',
+      tension: 0.3,
+      pointRadius: 3,
+      fill: true,
+    },
+    {
+      label: 'Humidity (%)',
+      data: [],
+      borderColor: '#4299e1',
+      backgroundColor: 'rgba(66,153,225,0.1)',
+      yAxisID: 'y1',
+      tension: 0.3,
+      pointRadius: 3,
+      fill: true,
+    }
+  ]
+};
+const iotChart = new Chart(ctx, {
+  type: 'line',
+  data: chartData,
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'top' },
+      title: { display: true, text: 'Live Temperature & Humidity' }
+    },
+    scales: {
+      y: {
+        type: 'linear',
+        display: true,
+        position: 'left',
+        min: 0,
+        max: 60
+      },
+      y1: {
+        type: 'linear',
+        display: true,
+        position: 'right',
+        min: 0,
+        max: 100,
+        grid: { drawOnChartArea: false }
+      }
+    }
+  }
+});
 
 function animateValue(id, newValue, unit) {
   const el = document.getElementById(id);
@@ -123,6 +186,30 @@ function animateValue(id, newValue, unit) {
   }
 }
 
+function setWeatherIcon(temp) {
+  const iconDiv = document.getElementById('temp-icon');
+  if (isNaN(temp)) { iconDiv.innerHTML = ''; return; }
+  if (temp >= 35) {
+    iconDiv.innerHTML = '🌞';
+  } else if (temp <= 15) {
+    iconDiv.innerHTML = '❄️';
+  } else {
+    iconDiv.innerHTML = '🌤️';
+  }
+}
+
+function setHumidityIcon(hum) {
+  const iconDiv = document.getElementById('hum-icon');
+  if (isNaN(hum)) { iconDiv.innerHTML = ''; return; }
+  if (hum >= 80) {
+    iconDiv.innerHTML = '💧';
+  } else if (hum <= 30) {
+    iconDiv.innerHTML = '🔥';
+  } else {
+    iconDiv.innerHTML = '🌫️';
+  }
+}
+
 function fetchData() {
   fetch(url)
     .then(res => res.json())
@@ -132,11 +219,26 @@ function fetchData() {
       const hum = parseFloat(feed.field2);
       animateValue("temp", temp, "°C");
       animateValue("hum", hum, "%");
+      setWeatherIcon(temp);
+      setHumidityIcon(hum);
       // Color feedback
       const tempCard = document.getElementById('temp-card');
       const humCard = document.getElementById('hum-card');
       tempCard.style.boxShadow = temp > 35 ? '0 4px 24px #f56565' : '0 4px 24px #b6c2d9';
       humCard.style.boxShadow = hum > 80 ? '0 4px 24px #63b3ed' : '0 4px 24px #b6c2d9';
+
+      // Update chart
+      const now = new Date();
+      const label = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+      if (chartData.labels.length > 20) {
+        chartData.labels.shift();
+        chartData.datasets[0].data.shift();
+        chartData.datasets[1].data.shift();
+      }
+      chartData.labels.push(label);
+      chartData.datasets[0].data.push(temp);
+      chartData.datasets[1].data.push(hum);
+      iotChart.update();
     })
     .catch(() => {
       document.getElementById("status").innerHTML = '<span class="dot" style="background:#e53e3e"></span> Connection error';
