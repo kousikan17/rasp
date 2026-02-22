@@ -5,47 +5,149 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IoT Temperature Monitoring</title>
   <style>
-    body { font-family: Arial; text-align: center; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      text-align: center;
+      background: linear-gradient(120deg, #f8fafc 0%, #e0e7ef 100%);
+      margin: 0;
+      min-height: 100vh;
+    }
+    .dashboard-title {
+      margin-top: 40px;
+      font-size: 2.5rem;
+      color: #2d3748;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 8px #e2e8f0;
+    }
+    .cards-container {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 40px;
+      flex-wrap: wrap;
+    }
     .card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 30px 20px 30px;
+      margin: 10px;
+      border-radius: 18px;
+      box-shadow: 0 4px 24px #b6c2d9;
+      width: 260px;
+      background: #fff;
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+    }
+    .card:hover {
+      transform: translateY(-8px) scale(1.03);
+      box-shadow: 0 8px 32px #a0aec0;
+    }
+    .card h2 {
+      margin-bottom: 10px;
+      color: #3182ce;
+      font-size: 1.4rem;
+    }
+    .value {
+      font-size: 2.8rem;
+      font-weight: bold;
+      color: #2d3748;
+      margin: 10px 0 0 0;
+      transition: color 0.3s;
+    }
+    .unit {
+      font-size: 1.1rem;
+      color: #718096;
+      margin-left: 6px;
+    }
+    .status {
+      margin-top: 30px;
+      font-size: 1.1rem;
+      color: #38a169;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #38a169;
+      animation: blink 1.2s infinite alternate;
       display: inline-block;
-      padding: 20px;
-      margin: 15px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px #aaa;
-      width: 220px;
+    }
+    @keyframes blink {
+      0% { opacity: 1; }
+      100% { opacity: 0.5; }
     }
   </style>
 </head>
 <body>
 
-<h1>IoT Temperature & Humidity Dashboard</h1>
+<div class="dashboard-title">IoT Temperature & Humidity Dashboard</div>
 
-<div class="card">
-  <h2>Temperature</h2>
-  <p id="temp">-- °C</p>
+<div class="cards-container">
+  <div class="card" id="temp-card">
+    <h2>Temperature</h2>
+    <span class="value" id="temp">--</span><span class="unit">°C</span>
+  </div>
+  <div class="card" id="hum-card">
+    <h2>Humidity</h2>
+    <span class="value" id="hum">--</span><span class="unit">%</span>
+  </div>
 </div>
 
-<div class="card">
-  <h2>Humidity</h2>
-  <p id="hum">-- %</p>
-</div>
+<div class="status" id="status"><span class="dot"></span> Live updating</div>
 
 <script>
 const url =
-"https://api.thingspeak.com/channels/3272751/feeds.json?api_key=YOUR_READ_API_KEY&results=1";
+  "https://api.thingspeak.com/channels/3272833/feeds.json?api_key=RY8Z0N9EF5ZOXLY5&results=1";
+
+function animateValue(id, newValue, unit) {
+  const el = document.getElementById(id);
+  const prev = parseFloat(el.innerText);
+  if (!isNaN(prev) && !isNaN(newValue)) {
+    let start = prev, end = newValue, duration = 600, startTime = null;
+    function step(ts) {
+      if (!startTime) startTime = ts;
+      let progress = Math.min((ts - startTime) / duration, 1);
+      let val = start + (end - start) * progress;
+      el.innerText = val.toFixed(1);
+      if (progress < 1) requestAnimationFrame(step);
+      else el.innerText = end.toFixed(1);
+    }
+    requestAnimationFrame(step);
+  } else {
+    el.innerText = isNaN(newValue) ? '--' : newValue;
+  }
+}
 
 function fetchData() {
   fetch(url)
     .then(res => res.json())
     .then(data => {
       const feed = data.feeds[0];
-      document.getElementById("temp").innerText = feed.field1 + " °C";
-      document.getElementById("hum").innerText = feed.field2 + " %";
+      const temp = parseFloat(feed.field1);
+      const hum = parseFloat(feed.field2);
+      animateValue("temp", temp, "°C");
+      animateValue("hum", hum, "%");
+      // Color feedback
+      const tempCard = document.getElementById('temp-card');
+      const humCard = document.getElementById('hum-card');
+      tempCard.style.boxShadow = temp > 35 ? '0 4px 24px #f56565' : '0 4px 24px #b6c2d9';
+      humCard.style.boxShadow = hum > 80 ? '0 4px 24px #63b3ed' : '0 4px 24px #b6c2d9';
+    })
+    .catch(() => {
+      document.getElementById("status").innerHTML = '<span class="dot" style="background:#e53e3e"></span> Connection error';
     });
 }
 
 fetchData();
-setInterval(fetchData, 5000);
+setInterval(() => {
+  document.getElementById("status").innerHTML = '<span class="dot"></span> Live updating';
+  fetchData();
+}, 5000);
 </script>
 
 </body>
